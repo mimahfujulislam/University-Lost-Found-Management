@@ -1,18 +1,19 @@
 <?php
-require_once __DIR__ . "/AuthController.php";
-require_once __DIR__ . "/../Model/Item.php";
-require_once __DIR__ . "/../Model/Claim.php";
+require '../model/Item.php';
+require '../model/Claim.php';
 
-function getModeratorDashboardData()
-{
+function getModeratorDashboardData(){
     $itemModel = new Item();
     $claimModel = new Claim();
 
-    return [
+    $data = [
         "pending_items" => $itemModel->countByStatus("Pending"),
         "pending_claims" => $claimModel->countByStatus("Pending"),
         "total_items" => $itemModel->countAll(),
         "recently_reviewed" => $itemModel->getRecentlyReviewed(5)
     ];
+
+    return $data;
 }
 ?>
+
