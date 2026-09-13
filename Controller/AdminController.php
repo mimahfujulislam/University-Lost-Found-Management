@@ -1,25 +1,27 @@
+
 <?php
 
-require_once __DIR__ . "/AuthController.php";
-require_once __DIR__ . "/../Model/User.php";
-require_once __DIR__ . "/../Model/Item.php";
-require_once __DIR__ . "/../Model/Claim.php";
-require_once __DIR__ . "/../Model/Category.php";
+session_start();
+
+require '../model/User.php';
+
+$_SESSION['globalErrMsg'] = "";
+$_SESSION['firstNameErrMsg'] = "";
+$_SESSION['lastNameErrMsg'] = "";
+$_SESSION['emailErrMsg'] = "";
+$_SESSION['phoneErrMsg'] = "";
+$_SESSION['usernameErrMsg'] = "";
+$_SESSION['passwordErrMsg'] = "";
+$_SESSION['roleErrMsg'] = "";
 
 function getAdminDashboardData()
 {
     $userModel = new User();
-    $itemModel = new Item();
-    $claimModel = new Claim();
-    $categoryModel = new Category();
 
     return [
         "total_users" => $userModel->countAll(),
         "students" => $userModel->countByRole("Student"),
-        "moderators" => $userModel->countByRole("Moderator"),
-        "items" => $itemModel->countAll(),
-        "claims" => $claimModel->countAll(),
-        "categories" => $categoryModel->countAll()
+        "moderators" => $userModel->countByRole("Moderator")
     ];
 }
 
@@ -30,361 +32,323 @@ function getAllUsersForAdmin()
     return $userModel->getAll();
 }
 
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["action"])) {
+if ($_SERVER['REQUEST_METHOD'] === "POST") {
 
-    $action = $_POST["action"];
+    $action = $_POST['action'] ?? "";
 
-    if ($action == "add_user") {
+    if ($action === "add_user") {
 
-        requireRole("Admin");
+        $firstName = htmlspecialchars($_POST['first_name'] ?? "");
+        $lastName = htmlspecialchars($_POST['last_name'] ?? "");
+        $email = htmlspecialchars($_POST['email'] ?? "");
+        $phone = htmlspecialchars($_POST['phone'] ?? "");
+        $username = htmlspecialchars($_POST['username'] ?? "");
+        $password = $_POST['password'] ?? "";
+        $role = htmlspecialchars($_POST['role'] ?? "");
 
-        $required = [
-            "first_name",
-            "last_name",
-            "email",
-            "phone",
-            "username",
-            "password",
-            "role"
-        ];
+        $flag = true;
 
-        foreach ($required as $field) {
+        if (empty($firstName)) {
+            $flag = false;
+            $_SESSION['firstNameErrMsg'] =
+                "Please fill up the first name properly";
+        }
 
-            if (cleanInput($_POST[$field] ?? "") == "") {
+        if (empty($lastName)) {
+            $flag = false;
+            $_SESSION['lastNameErrMsg'] =
+                "Please fill up the last name properly";
+        }
 
-                setMessage(
-                    "error",
-                    "Please fill all required fields."
-                );
-
-                redirectTo(
-                    viewPath("admin-users.php")
-                );
+        if (empty($email)) {
+            $flag = false;
+            $_SESSION['emailErrMsg'] =
+                "Please fill up the email properly";
+        }
+        else {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $flag = false;
+                $_SESSION['emailErrMsg'] =
+                    "Please enter a valid email address";
             }
         }
 
-        $firstName = cleanInput($_POST["first_name"]);
-        $lastName = cleanInput($_POST["last_name"]);
-        $email = cleanInput($_POST["email"]);
-        $phone = cleanInput($_POST["phone"]);
-        $username = cleanInput($_POST["username"]);
-        $password = $_POST["password"];
-        $role = cleanInput($_POST["role"]);
-
-        $userModel = new User();
-
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-
-            setMessage(
-                "error",
-                "Please enter a valid email address."
-            );
-
-            redirectTo(
-                viewPath("admin-users.php")
-            );
+        if (empty($phone)) {
+            $flag = false;
+            $_SESSION['phoneErrMsg'] =
+                "Please fill up the phone number properly";
         }
 
-        if (!validRole($role)) {
-
-            setMessage(
-                "error",
-                "Please select a valid role."
-            );
-
-            redirectTo(
-                viewPath("admin-users.php")
-            );
+        if (empty($username)) {
+            $flag = false;
+            $_SESSION['usernameErrMsg'] =
+                "Please fill up the username properly";
         }
 
-        if (
-            strlen($password) < 8 ||
-            !preg_match("/[A-Z]/", $password) ||
-            !preg_match("/[a-z]/", $password) ||
-            !preg_match("/[0-9]/", $password) ||
-            !preg_match("/[\W_]/", $password)
-        ) {
-
-            setMessage(
-                "error",
-                "Password must be at least 8 characters and contain uppercase, lowercase, number, and special character."
-            );
-
-            redirectTo(
-                viewPath("admin-users.php")
-            );
+        if (empty($password)) {
+            $flag = false;
+            $_SESSION['passwordErrMsg'] =
+                "Please fill up the password properly";
         }
 
-        if ($userModel->emailExists($email)) {
-
-            setMessage(
-                "error",
-                "Email already exists."
-            );
-
-            redirectTo(
-                viewPath("admin-users.php")
-            );
+        if (empty($role)) {
+            $flag = false;
+            $_SESSION['roleErrMsg'] =
+                "Please select a role";
         }
 
-        if ($userModel->usernameExists($username)) {
+        if ($flag) {
 
-            setMessage(
-                "error",
-                "Username already exists."
+            $userModel = new User();
+
+            if ($userModel->emailExists($email)) {
+
+                $_SESSION['emailErrMsg'] =
+                    "Email already exists";
+
+                header("Location: ../view/admin-users.php");
+                exit();
+            }
+
+            if ($userModel->usernameExists($username)) {
+
+                $_SESSION['usernameErrMsg'] =
+                    "Username already exists";
+
+                header("Location: ../view/admin-users.php");
+                exit();
+            }
+
+            if (
+                strlen($password) < 8 ||
+                !preg_match("/[A-Z]/", $password) ||
+                !preg_match("/[a-z]/", $password) ||
+                !preg_match("/[0-9]/", $password) ||
+                !preg_match("/[\W_]/", $password)
+            ) {
+
+                $_SESSION['passwordErrMsg'] =
+                    "Password must be at least 8 characters and contain uppercase, lowercase, number and special character";
+
+                header("Location: ../view/admin-users.php");
+                exit();
+            }
+
+            $passwordHash = password_hash(
+                $password,
+                PASSWORD_DEFAULT
             );
 
-            redirectTo(
-                viewPath("admin-users.php")
-            );
+            $data = [
+                "first_name" => $firstName,
+                "last_name" => $lastName,
+                "email" => $email,
+                "phone" => $phone,
+                "username" => $username,
+                "password" => $passwordHash,
+                "role" => $role
+            ];
+
+            $newUserId = $userModel->create($data);
+
+            if ($newUserId) {
+
+                $_SESSION['globalErrMsg'] =
+                    "User added successfully";
+
+                header("Location: ../view/admin-users.php");
+                exit();
+            }
+            else {
+
+                $_SESSION['globalErrMsg'] =
+                    "User creation failed";
+
+                header("Location: ../view/admin-users.php");
+                exit();
+            }
         }
+        else {
 
-        $passwordHash = password_hash(
-            $password,
-            PASSWORD_DEFAULT
-        );
+            $_SESSION['globalErrMsg'] =
+                "Please correct the errors";
 
-        $data = [
-            "first_name" => $firstName,
-            "last_name" => $lastName,
-            "email" => $email,
-            "phone" => $phone,
-            "username" => $username,
-            "password" => $passwordHash,
-            "role" => $role
-        ];
-
-        $newUserId = $userModel->create($data);
-
-        if (!$newUserId) {
-
-            setMessage(
-                "error",
-                "User creation failed."
-            );
-
-            redirectTo(
-                viewPath("admin-users.php")
-            );
+            header("Location: ../view/admin-users.php");
+            exit();
         }
-
-        setMessage(
-            "success",
-            "User added successfully."
-        );
-
-        redirectTo(
-            viewPath("admin-users.php")
-        );
     }
 
-    if ($action == "update_user") {
+    elseif ($action === "update_user") {
 
-        requireRole("Admin");
+        $id = (int)($_POST['id'] ?? 0);
 
-        $id = (int) ($_POST["id"] ?? 0);
+        $firstName = htmlspecialchars($_POST['first_name'] ?? "");
+        $lastName = htmlspecialchars($_POST['last_name'] ?? "");
+        $email = htmlspecialchars($_POST['email'] ?? "");
+        $phone = htmlspecialchars($_POST['phone'] ?? "");
+        $username = htmlspecialchars($_POST['username'] ?? "");
+        $role = htmlspecialchars($_POST['role'] ?? "");
 
-        $required = [
-            "first_name",
-            "last_name",
-            "email",
-            "phone",
-            "username",
-            "role"
-        ];
+        $flag = true;
 
-        foreach ($required as $field) {
+        if ($id <= 0) {
 
-            if (cleanInput($_POST[$field] ?? "") == "") {
+            $flag = false;
 
-                setMessage(
-                    "error",
-                    "Please fill all required fields."
-                );
+            $_SESSION['globalErrMsg'] =
+                "Invalid user ID";
+        }
 
-                redirectTo(
-                    viewPath("admin-users.php")
-                );
+        if (empty($firstName)) {
+
+            $flag = false;
+
+            $_SESSION['firstNameErrMsg'] =
+                "Please fill up the first name properly";
+        }
+
+        if (empty($lastName)) {
+
+            $flag = false;
+
+            $_SESSION['lastNameErrMsg'] =
+                "Please fill up the last name properly";
+        }
+
+        if (empty($email)) {
+
+            $flag = false;
+
+            $_SESSION['emailErrMsg'] =
+                "Please fill up the email properly";
+        }
+        else {
+
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+
+                $flag = false;
+
+                $_SESSION['emailErrMsg'] =
+                    "Please enter a valid email address";
             }
         }
 
-        $firstName = cleanInput($_POST["first_name"]);
-        $lastName = cleanInput($_POST["last_name"]);
-        $email = cleanInput($_POST["email"]);
-        $phone = cleanInput($_POST["phone"]);
-        $username = cleanInput($_POST["username"]);
-        $role = cleanInput($_POST["role"]);
+        if (empty($phone)) {
 
-        $userModel = new User();
+            $flag = false;
 
-        if ($id <= 0) {
-
-            setMessage(
-                "error",
-                "Invalid user ID."
-            );
-
-            redirectTo(
-                viewPath("admin-users.php")
-            );
+            $_SESSION['phoneErrMsg'] =
+                "Please fill up the phone number properly";
         }
 
-        if (!$userModel->findById($id)) {
+        if (empty($username)) {
 
-            setMessage(
-                "error",
-                "User not found."
-            );
+            $flag = false;
 
-            redirectTo(
-                viewPath("admin-users.php")
-            );
+            $_SESSION['usernameErrMsg'] =
+                "Please fill up the username properly";
         }
 
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (empty($role)) {
 
-            setMessage(
-                "error",
-                "Please enter a valid email address."
-            );
+            $flag = false;
 
-            redirectTo(
-                viewPath("admin-users.php")
-            );
+            $_SESSION['roleErrMsg'] =
+                "Please select a role";
         }
 
-        if (!validRole($role)) {
+        if ($flag) {
 
-            setMessage(
-                "error",
-                "Please select a valid role."
+            $userModel = new User();
+
+            $user = $userModel->findById($id);
+
+            if (!$user) {
+
+                $_SESSION['globalErrMsg'] =
+                    "User not found";
+
+                header("Location: ../view/admin-users.php");
+                exit();
+            }
+
+            if ($userModel->emailExists($email, $id)) {
+
+                $_SESSION['emailErrMsg'] =
+                    "Email already exists";
+
+                header("Location: ../view/admin-users.php");
+                exit();
+            }
+
+            if ($userModel->usernameExists($username, $id)) {
+
+                $_SESSION['usernameErrMsg'] =
+                    "Username already exists";
+
+                header("Location: ../view/admin-users.php");
+                exit();
+            }
+
+            $data = [
+                "first_name" => $firstName,
+                "last_name" => $lastName,
+                "email" => $email,
+                "phone" => $phone,
+                "username" => $username,
+                "role" => $role
+            ];
+
+            $result = $userModel->updateByAdmin(
+                $id,
+                $data
             );
 
-            redirectTo(
-                viewPath("admin-users.php")
-            );
+            if ($result) {
+
+                $_SESSION['globalErrMsg'] =
+                    "User updated successfully";
+
+                header("Location: ../view/admin-users.php");
+                exit();
+            }
+            else {
+
+                $_SESSION['globalErrMsg'] =
+                    "User update failed";
+
+                header("Location: ../view/admin-users.php");
+                exit();
+            }
         }
+        else {
 
-        if ($userModel->emailExists($email, $id)) {
+            $_SESSION['globalErrMsg'] =
+                "Please correct the errors";
 
-            setMessage(
-                "error",
-                "Email already exists."
-            );
-
-            redirectTo(
-                viewPath("admin-users.php")
-            );
+            header("Location: ../view/admin-users.php");
+            exit();
         }
-
-        if ($userModel->usernameExists($username, $id)) {
-
-            setMessage(
-                "error",
-                "Username already exists."
-            );
-
-            redirectTo(
-                viewPath("admin-users.php")
-            );
-        }
-
-        $data = [
-            "first_name" => $firstName,
-            "last_name" => $lastName,
-            "email" => $email,
-            "phone" => $phone,
-            "username" => $username,
-            "role" => $role
-        ];
-
-        if (!$userModel->updateByAdmin($id, $data)) {
-
-            setMessage(
-                "error",
-                "User update failed."
-            );
-
-            redirectTo(
-                viewPath("admin-users.php")
-            );
-        }
-
-        setMessage(
-            "success",
-            "User updated successfully."
-        );
-
-        redirectTo(
-            viewPath("admin-users.php")
-        );
     }
 
-    if ($action == "delete_user") {
+    else {
 
-        requireRole("Admin");
+        $_SESSION['globalErrMsg'] =
+            "Something went wrong.";
 
-        $id = (int) ($_POST["id"] ?? 0);
-
-        if ($id <= 0) {
-
-            setMessage(
-                "error",
-                "Invalid user ID."
-            );
-
-            redirectTo(
-                viewPath("admin-users.php")
-            );
-        }
-
-        if ($id == $_SESSION["user_id"]) {
-
-            setMessage(
-                "error",
-                "You cannot delete your own account."
-            );
-
-            redirectTo(
-                viewPath("admin-users.php")
-            );
-        }
-
-        $userModel = new User();
-
-        if (!$userModel->findById($id)) {
-
-            setMessage(
-                "error",
-                "User not found."
-            );
-
-            redirectTo(
-                viewPath("admin-users.php")
-            );
-        }
-
-        if (!$userModel->delete($id)) {
-
-            setMessage(
-                "error",
-                "User deletion failed."
-            );
-
-            redirectTo(
-                viewPath("admin-users.php")
-            );
-        }
-
-        setMessage(
-            "success",
-            "User deleted successfully."
-        );
-
-        redirectTo(
-            viewPath("admin-users.php")
-        );
+        header("Location: ../view/admin-users.php");
+        exit();
     }
 }
 
+else {
+
+    $_SESSION['globalErrMsg'] =
+        "Something went wrong.";
+
+    header("Location: ../view/admin-users.php");
+    exit();
+}
+
 ?>
+
